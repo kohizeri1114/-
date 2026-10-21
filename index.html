@@ -36,9 +36,11 @@ input,select{border:1px solid var(--bd);background:var(--bg);border-radius:8px;p
 .tw{overflow-x:auto}
 table{border-collapse:collapse;width:100%}
 th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+details.mt{border-bottom:1px solid var(--bd);padding:6px 0}details.mt summary{cursor:pointer}
 tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 </style></head><body><div class="w">
 <h1>ろるぱーくカスタム管理アプリ</h1>
+<div class="card"><div class="row"><b>団体</b><select id="gs"></select><input id="gn" type="text" placeholder="団体名（例: LTK）" maxlength="20"><button id="ga">追加</button><button id="gr">名前変更</button><button id="gd">削除</button></div><div class="mu" id="gm" style="margin-top:6px">団体ごとに参加者・戦績が別管理されます。</div></div>
 <div class="tabs"><button id="t1" class="on">チーム分け</button><button id="t2">戦績</button></div>
 
 <div id="p1">
@@ -61,7 +63,7 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 <div id="p2" hidden>
   <div class="card"><div class="tw" id="st"></div></div>
   <div class="card" id="dt" hidden></div>
-  <div class="card"><div class="mu" id="hs"></div></div>
+  <div class="card"><b>試合履歴</b><div class="mu" id="mm">チャンピオン・KDAの修正、勝敗の変更、削除ができます。</div><div id="mh" style="margin-top:8px"></div></div>
   <div class="card"><div class="row"><button id="ex">JSONを書き出し</button><label class="mu">読み込み: <input id="im" type="file" accept=".json,application/json"></label></div>
   <details id="io" style="margin-top:8px"><summary class="mu">テキストでコピー／貼り付け</summary><textarea id="ta" rows="6" style="width:100%;margin-top:6px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:6px"><button id="sh">現在のデータを表示</button><button id="ld">貼り付けた内容を読み込む</button></div></details>
   <div class="mu" id="msg" style="margin-top:6px">読み込みは既存データに追加されます（同じ試合は重複しません）</div></div>
@@ -70,11 +72,13 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 <script>
 const R=["TOP","JG","MID","ADC","SUP"];
 const K="lolsplit_v1";
-let S={players:[],history:[]};
+let DB={groups:[],cur:""},S;
 let cur=null;
-try{const x=localStorage.getItem(K);if(x)S=JSON.parse(x)}catch(e){}
-if(!S.players)S.players=[];if(!S.history)S.history=[];
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+try{const x=localStorage.getItem(K);if(x){const d=JSON.parse(x);DB=d.groups?d:{groups:[{id:"g1",name:"デフォルト",players:d.players||[],history:d.history||[]}],cur:"g1"};}}catch(e){}
+if(!DB.groups.length)DB={groups:[{id:"g1",name:"デフォルト",players:[],history:[]}],cur:"g1"};
+const setG=id=>{S=DB.groups.find(g=>g.id===id)||DB.groups[0];DB.cur=S.id;if(!S.players)S.players=[];if(!S.history)S.history=[];};
+setG(DB.cur);
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){}};
 const $=i=>document.getElementById(i);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mode=()=>document.querySelector('input[name=m]:checked').value;
@@ -136,7 +140,7 @@ $("res").addEventListener("click",e=>{
     const p=m[el.dataset.s][el.dataset.i],f=el.dataset.f,v=el.value.trim();
     if(f==="champ")p.champ=v;else p[f]=v===""?null:Number(v);
   });
-  S.history.push(m);save();cur=null;
+  S.history.push(m);save();cur=null;gl();
   $("res").innerHTML='<div class="card">保存しました。「戦績」タブで確認できます。</div>';
 });
 
@@ -151,13 +155,17 @@ function agg(){
   })));
   return A;
 }
+let openId=null,delArm=null;
+function mh(){
+  const side=(t,sd)=>t.map((p,i)=>`<div class="slot"><div class="role">${p.role||"　"}</div><div><b>${esc(p.name)}</b></div><div class="in"><input data-f="champ" data-s="${sd}" data-i="${i}" placeholder="チャンピオン" value="${esc(p.champ||"")}" style="flex:1;min-width:100px">${["k","d","a"].map(f=>`<input class="n" data-f="${f}" data-s="${sd}" data-i="${i}" type="number" min="0" placeholder="${f.toUpperCase()}" value="${p[f]==null?"":p[f]}">`).join("")}</div></div>`).join("");
+  const L=S.history.slice().reverse();
+  $("mh").innerHTML=L.length?L.map(m=>`<details class="mt" data-id="${m.id}"${m.id===openId?" open":""}><summary>${esc(m.date)}　<b style="color:var(--${m.winner==="blue"?"bl":"rd"})">${m.winner==="blue"?"ブルー":"レッド"}勝利</b>　<span class="mu">${m.mode==="role"?"ロールあり":"ロールなし"}</span></summary><div class="teams" style="margin:8px 0"><div class="team bl"><h3>ブルー</h3>${side(m.blue,"blue")}</div><div class="team rd"><h3>レッド</h3>${side(m.red,"red")}</div></div><div class="row" style="margin-bottom:6px"><button class="pri" data-a="save">変更を保存</button><button data-a="flip">勝敗を逆にする</button><button class="r" data-a="del">削除</button></div></details>`).join(""):'<div class="mu">まだ記録がありません。</div>';
+}
 const pct=(w,g)=>g?Math.round(w/g*100)+"%":"-";
-function stats(){
+function stats(){gl();mh();
   const A=agg(),names=Object.keys(A).sort((a,b)=>A[b].g-A[a].g);
   $("dt").hidden=true;
-  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>試合</th><th>勝</th><th>勝率</th><th>平均KDA</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細</div>`:'<div class="mu">まだ記録がありません。</div>';
-  const last=S.history.slice(-8).reverse();
-  $("hs").innerHTML=`試合履歴: ${S.history.length}件`+(last.length?`<br>`+last.map(m=>`${m.date} ${m.winner==="blue"?"ブルー":"レッド"}勝利`).join(" / "):"")+(S.history.length?`<br><button id="undo" style="margin-top:8px">直近の1試合を削除</button>`:"");
+  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>試合数</th><th>勝利数</th><th>勝率</th><th>平均KDA</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細</div>`:'<div class="mu">まだ記録がありません。</div>';
 }
 $("st").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-n]");if(!tr)return;
@@ -168,8 +176,7 @@ $("st").addEventListener("click",e=>{
   <h4>ピックチャンピオン</h4>${Object.keys(a.ch).length?`<div class="tw"><table><tr><th>チャンプ</th><th>試合</th><th>勝率</th></tr>${rows(a.ch)}</table></div>`:'<div class="mu">記録なし</div>'}
   <h4>ロール別</h4>${Object.keys(a.ro).length?`<div class="tw"><table><tr><th>ロール</th><th>試合</th><th>勝率</th></tr>${rows(a.ro)}</table></div>`:'<div class="mu">記録なし</div>'}`;
 });
-$("hs").addEventListener("click",e=>{if(e.target.id==="undo"&&confirm("直近の試合を削除しますか？")){S.history.pop();save();stats();}});
-function data(){return JSON.stringify({app:"lol-team-splitter",v:1,players:S.players,history:S.history},null,1);}
+function data(){return JSON.stringify({app:"lol-team-splitter",v:2,group:S.name,players:S.players,history:S.history},null,1);}
 function merge(txt){
   let d;try{d=JSON.parse(txt)}catch(e){return "JSONとして読み込めませんでした。";}
   if(!d||!Array.isArray(d.history))return "形式が違います。";
@@ -177,14 +184,48 @@ function merge(txt){
   d.history.forEach(m=>{if(m&&m.id&&!ids.has(m.id)){S.history.push(m);ids.add(m.id);n++;}});
   S.history.sort((a,b)=>a.id-b.id);
   (d.players||[]).forEach(p=>{if(p&&p.name&&!S.players.some(q=>q.name===p.name))S.players.push({name:String(p.name),pref:p.pref||"",side:p.side||"",prio:!!p.prio});});
-  save();pl();stats();return n+"試合を追加しました。";
+  save();pl();gl();stats();return "「"+S.name+"」に"+n+"試合を追加しました。";
 }
 $("ex").onclick=()=>{
-  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data()],{type:"application/json"}));a.download="lol-data.json";a.click();}catch(e){}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data()],{type:"application/json"}));a.download="lol-"+S.name+".json";a.click();}catch(e){}
   $("ta").value=data();$("io").open=true;$("msg").textContent="ダウンロードされない環境では、下のテキストをコピーして data.json として保存してください。";
 };
 $("im").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$("msg").textContent=merge(r.result);};r.readAsText(f);e.target.value="";};
 $("ld").onclick=()=>{$("msg").textContent=merge($("ta").value);};
 $("sh").onclick=()=>{$("ta").value=data();};
-pl();
+function gl(){$("gs").innerHTML=DB.groups.map(g=>`<option value="${g.id}"${g.id===DB.cur?" selected":""}>${esc(g.name)}（${g.history.length}試合）</option>`).join("");}
+function refresh(){cur=null;$("res").innerHTML="";pl();gl();stats();}
+$("gs").onchange=e=>{setG(e.target.value);save();refresh();$("gm").textContent="「"+S.name+"」に切り替えました。";};
+$("ga").onclick=()=>{
+  const v=$("gn").value.trim();
+  if(!v){$("gm").textContent="団体名を入力してください。";return;}
+  if(DB.groups.some(g=>g.name===v)){$("gm").textContent="同じ名前の団体があります。";return;}
+  const id="g"+Date.now();DB.groups.push({id,name:v,players:[],history:[]});setG(id);save();$("gn").value="";refresh();$("gm").textContent="「"+v+"」を作成して切り替えました。";
+};
+$("gr").onclick=()=>{
+  const v=$("gn").value.trim();
+  if(!v){$("gm").textContent="新しい名前を入力してから押してください。";return;}
+  if(DB.groups.some(g=>g.name===v)){$("gm").textContent="同じ名前の団体があります。";return;}
+  S.name=v;save();$("gn").value="";gl();$("gm").textContent="名前を変更しました。";
+};
+let gdArm=false;
+$("gd").onclick=()=>{
+  if(DB.groups.length<2){$("gm").textContent="最後の1団体は削除できません。";return;}
+  if(!gdArm){gdArm=true;$("gd").textContent="本当に削除";$("gm").textContent="「"+S.name+"」の参加者と戦績が消えます。もう一度押すと削除します。";setTimeout(()=>{gdArm=false;$("gd").textContent="削除";},4000);return;}
+  gdArm=false;$("gd").textContent="削除";DB.groups=DB.groups.filter(g=>g!==S);setG(DB.groups[0].id);save();refresh();$("gm").textContent="削除しました。";
+};
+$("mh").addEventListener("click",e=>{
+  const a=e.target.dataset.a;if(!a)return;
+  const d=e.target.closest("details"),id=Number(d.dataset.id),m=S.history.find(x=>x.id===id);if(!m)return;
+  if(a==="del"){
+    if(delArm!==id){delArm=id;e.target.textContent="本当に削除";$("mm").textContent="この試合の記録が消えます。もう一度「本当に削除」を押すと削除します。";return;}
+    S.history=S.history.filter(x=>x.id!==id);save();openId=null;delArm=null;stats();$("mm").textContent="削除しました。";return;
+  }
+  if(a==="save"){
+    d.querySelectorAll("input[data-f]").forEach(el=>{const p=m[el.dataset.s][el.dataset.i],f=el.dataset.f,v=el.value.trim();if(f==="champ")p.champ=v;else p[f]=v===""?null:Number(v);});
+    save();openId=id;delArm=null;stats();$("mm").textContent="変更を保存しました。";return;
+  }
+  if(a==="flip"){m.winner=m.winner==="blue"?"red":"blue";save();openId=id;delArm=null;stats();$("mm").textContent="勝敗を変更しました。";}
+});
+pl();gl();
 </script></body></html>
