@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LoLカスタム チーム分け</title>
+<title>ろるぱーくカスタム管理アプリ</title>
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--tx:#1b1f2a;--mu:#6b7280;--bd:#e3e6ee;--bl:#2563eb;--rd:#dc2626;--ac:#7c3aed;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1219;--card:#181c27;--tx:#e8eaf0;--mu:#9aa3b2;--bd:#2a3042;--bl:#60a5fa;--rd:#f87171;--ac:#a78bfa}}
@@ -38,7 +38,7 @@ table{border-collapse:collapse;width:100%}
 th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
 tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 </style></head><body><div class="w">
-<h1>LoLカスタム チーム分け</h1>
+<h1>ろるぱーくカスタム管理アプリ</h1>
 <div class="tabs"><button id="t1" class="on">チーム分け</button><button id="t2">戦績</button></div>
 
 <div id="p1">
@@ -53,7 +53,7 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
       <label><input type="radio" name="m" value="role"> ロール指定あり</label>
       <button class="pri" id="go">チーム分け！</button>
     </div>
-    <div class="mu">ロールありは、各プレイヤーの希望ロール（上のプルダウン）を優先し、残りはランダムです。</div>
+    <div class="mu">選択した希望ロール・希望サイドが優先されます。11人以上のときは10人をランダムに選び観戦者を抽選します。「優先出場」にチェックした人は優先的に出場します。</div>
   </div>
   <div id="res"></div>
 </div>
@@ -62,6 +62,9 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
   <div class="card"><div class="tw" id="st"></div></div>
   <div class="card" id="dt" hidden></div>
   <div class="card"><div class="mu" id="hs"></div></div>
+  <div class="card"><div class="row"><button id="ex">JSONを書き出し</button><label class="mu">読み込み: <input id="im" type="file" accept=".json,application/json"></label></div>
+  <details id="io" style="margin-top:8px"><summary class="mu">テキストでコピー／貼り付け</summary><textarea id="ta" rows="6" style="width:100%;margin-top:6px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:6px"><button id="sh">現在のデータを表示</button><button id="ld">貼り付けた内容を読み込む</button></div></details>
+  <div class="mu" id="msg" style="margin-top:6px">読み込みは既存データに追加されます（同じ試合は重複しません）</div></div>
 </div>
 </div>
 <script>
@@ -82,15 +85,15 @@ $("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
 function addP(){
   const v=$("nm").value.trim();if(!v)return;
   if(S.players.some(p=>p.name===v)){$("nm").select();return;}
-  S.players.push({name:v,pref:""});$("nm").value="";save();pl();
+  S.players.push({name:v,pref:"",side:""});$("nm").value="";save();pl();
 }
 $("add").onclick=addP;
 $("nm").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();addP();}});
 function pl(){
-  $("pl").innerHTML=S.players.map((p,i)=>`<span class="chip">${esc(p.name)}<select data-i="${i}"><option value="">希望なし</option>${R.map(r=>`<option${p.pref===r?" selected":""}>${r}</option>`).join("")}</select><button class="x" data-d="${i}">✕</button></span>`).join("");
-  $("cnt").textContent=`${S.players.length}人`+(S.players.length>10?"（10人まで）":"");
+  $("pl").innerHTML=S.players.map((p,i)=>`<span class="chip">${esc(p.name)}<select data-i="${i}" data-k="pref"><option value="">ロール希望なし</option>${R.map(r=>`<option${p.pref===r?" selected":""}>${r}</option>`).join("")}</select><select data-i="${i}" data-k="side"><option value="">サイド希望なし</option><option value="blue"${p.side==="blue"?" selected":""}>ブルー</option><option value="red"${p.side==="red"?" selected":""}>レッド</option><option value="spec"${p.side==="spec"?" selected":""}>観戦</option></select><label class="mu" style="font-size:12px"><input type="checkbox" data-i="${i}" data-k="prio"${p.prio?" checked":""}>優先出場</label><button class="x" data-d="${i}">✕</button></span>`).join("");
+  $("cnt").textContent=`${S.players.length}人`+(()=>{const w=S.players.filter(p=>p.side==="spec").length,a=S.players.length-w,s=w+Math.max(0,a-10);return s?`（出場${S.players.length-s}人、観戦${s}人）`:"";})();
 }
-$("pl").addEventListener("change",e=>{if(e.target.dataset.i!=null){S.players[e.target.dataset.i].pref=e.target.value;save();}});
+$("pl").addEventListener("change",e=>{if(e.target.dataset.k){S.players[e.target.dataset.i][e.target.dataset.k]=e.target.type==="checkbox"?e.target.checked:e.target.value;save();}});
 $("pl").addEventListener("click",e=>{if(e.target.dataset.d!=null){S.players.splice(e.target.dataset.d,1);save();pl();}});
 
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
@@ -102,9 +105,16 @@ function assign(team,useRole){
   return out.sort((a,b)=>R.indexOf(a.role)-R.indexOf(b.role));
 }
 $("go").onclick=()=>{
-  if(S.players.length<2||S.players.length>10){$("res").innerHTML='<div class="card">2〜10人で実行してください。</div>';return;}
-  const ps=shuf(S.players.slice()),h=Math.ceil(ps.length/2),ur=mode()==="role";
-  cur={mode:ur?"role":"free",blue:assign(ps.slice(0,h),ur),red:assign(ps.slice(h),ur)};
+  const sw=S.players.filter(p=>p.side==="spec"),pool=S.players.filter(p=>p.side!=="spec");
+  if(pool.length<2){$("res").innerHTML='<div class="card">観戦希望を除いて2人以上必要です。</div>';return;}
+  const pr=shuf(pool.filter(p=>p.prio)),ot=shuf(pool.filter(p=>!p.prio)),order=pr.concat(ot),ps=order.slice(0,10),spec=order.slice(10).concat(shuf(sw)),n=ps.length,h=Math.ceil(n/2),ur=mode()==="role";
+  const bs=n%2&&Math.random()<.5?n-h:h,rs=n-bs;
+  let B=ps.filter(p=>p.side==="blue"),Rd=ps.filter(p=>p.side==="red"),rest=ps.filter(p=>p.side!=="blue"&&p.side!=="red");
+  rest=rest.concat(B.splice(bs),Rd.splice(rs));
+  shuf(rest);
+  while(B.length<bs)B.push(rest.pop());
+  while(Rd.length<rs)Rd.push(rest.pop());
+  cur={mode:ur?"role":"free",blue:assign(B,ur),red:assign(Rd,ur),spec:spec.map(p=>p.name)};
   show();
 };
 function slot(side,t){
@@ -116,7 +126,7 @@ function slot(side,t){
 }
 function show(){
   $("res").innerHTML=`<div class="teams"><div class="team bl"><h3>ブルーサイド</h3>${slot("blue",cur.blue)}</div><div class="team rd"><h3>レッドサイド</h3>${slot("red",cur.red)}</div></div>
-  <div class="card" style="margin-top:14px"><div class="mu">試合後にチャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
+  ${cur.spec&&cur.spec.length?`<div class="card" style="margin-top:14px"><b>観戦</b>：${cur.spec.map(esc).join("、")}</div>`:""}<div class="card" style="margin-top:14px"><div class="mu">試合後にチャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
   <div class="row" style="margin-top:8px"><button class="b" data-w="blue">ブルー勝利で保存</button><button class="r" data-w="red">レッド勝利で保存</button></div></div>`;
 }
 $("res").addEventListener("click",e=>{
@@ -159,5 +169,22 @@ $("st").addEventListener("click",e=>{
   <h4>ロール別</h4>${Object.keys(a.ro).length?`<div class="tw"><table><tr><th>ロール</th><th>試合</th><th>勝率</th></tr>${rows(a.ro)}</table></div>`:'<div class="mu">記録なし</div>'}`;
 });
 $("hs").addEventListener("click",e=>{if(e.target.id==="undo"&&confirm("直近の試合を削除しますか？")){S.history.pop();save();stats();}});
+function data(){return JSON.stringify({app:"lol-team-splitter",v:1,players:S.players,history:S.history},null,1);}
+function merge(txt){
+  let d;try{d=JSON.parse(txt)}catch(e){return "JSONとして読み込めませんでした。";}
+  if(!d||!Array.isArray(d.history))return "形式が違います。";
+  const ids=new Set(S.history.map(m=>m.id));let n=0;
+  d.history.forEach(m=>{if(m&&m.id&&!ids.has(m.id)){S.history.push(m);ids.add(m.id);n++;}});
+  S.history.sort((a,b)=>a.id-b.id);
+  (d.players||[]).forEach(p=>{if(p&&p.name&&!S.players.some(q=>q.name===p.name))S.players.push({name:String(p.name),pref:p.pref||"",side:p.side||"",prio:!!p.prio});});
+  save();pl();stats();return n+"試合を追加しました。";
+}
+$("ex").onclick=()=>{
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data()],{type:"application/json"}));a.download="lol-data.json";a.click();}catch(e){}
+  $("ta").value=data();$("io").open=true;$("msg").textContent="ダウンロードされない環境では、下のテキストをコピーして data.json として保存してください。";
+};
+$("im").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$("msg").textContent=merge(r.result);};r.readAsText(f);e.target.value="";};
+$("ld").onclick=()=>{$("msg").textContent=merge($("ta").value);};
+$("sh").onclick=()=>{$("ta").value=data();};
 pl();
 </script></body></html>
