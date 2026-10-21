@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LoLカスタム チーム分け</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#1b1f2a;--mu:#6b7280;--bd:#e3e6ee;--bl:#2563eb;--rd:#dc2626;--ac:#7c3aed;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1219;--card:#181c27;--tx:#e8eaf0;--mu:#9aa3b2;--bd:#2a3042;--bl:#60a5fa;--rd:#f87171;--ac:#a78bfa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+.w{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+button,select,input{font:inherit;color:var(--tx)}
+button{border:1px solid var(--bd);background:var(--card);border-radius:8px;padding:8px 14px;cursor:pointer}
+button.on,button.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+button.b{background:var(--bl);border-color:var(--bl);color:#fff}
+button.r{background:var(--rd);border-color:var(--rd);color:#fff}
+input,select{border:1px solid var(--bd);background:var(--bg);border-radius:8px;padding:8px 10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input[type=text]{flex:1;min-width:140px}
+.chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--bd);border-radius:999px;padding:3px 6px 3px 12px;margin:4px 6px 0 0;background:var(--bg)}
+.chip select{padding:2px 4px;font-size:12px}
+.chip .x{border:0;background:none;padding:2px 6px;color:var(--mu)}
+.mu{color:var(--mu);font-size:13px}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:620px){.teams{grid-template-columns:1fr}}
+.team{border-radius:12px;padding:12px;border:2px solid}
+.team.bl{border-color:var(--bl)}.team.rd{border-color:var(--rd)}
+.team h3{margin:0 0 8px;font-size:16px}.bl h3{color:var(--bl)}.rd h3{color:var(--rd)}
+.slot{display:grid;grid-template-columns:44px 1fr;gap:6px;align-items:center;margin-bottom:8px}
+.role{font-size:12px;font-weight:700;color:var(--mu)}
+.slot .in{display:flex;gap:4px;flex-wrap:wrap;grid-column:2}
+.slot .in input{width:100%}
+.slot .in input.n{width:54px;padding:6px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
+</style></head><body><div class="w">
+<h1>LoLカスタム チーム分け</h1>
+<div class="tabs"><button id="t1" class="on">チーム分け</button><button id="t2">戦績</button></div>
+
+<div id="p1">
+  <div class="card">
+    <div class="row"><input id="nm" type="text" placeholder="名前を入力（Enterで追加）" maxlength="20"><button class="pri" id="add">追加</button></div>
+    <div id="pl"></div>
+    <div class="mu" id="cnt"></div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <label><input type="radio" name="m" value="free" checked> ロール指定なし</label>
+      <label><input type="radio" name="m" value="role"> ロール指定あり</label>
+      <button class="pri" id="go">チーム分け！</button>
+    </div>
+    <div class="mu">ロールありは、各プレイヤーの希望ロール（上のプルダウン）を優先し、残りはランダムです。</div>
+  </div>
+  <div id="res"></div>
+</div>
+
+<div id="p2" hidden>
+  <div class="card"><div class="tw" id="st"></div></div>
+  <div class="card" id="dt" hidden></div>
+  <div class="card"><div class="mu" id="hs"></div></div>
+</div>
+</div>
+<script>
+const R=["TOP","JG","MID","ADC","SUP"];
+const K="lolsplit_v1";
+let S={players:[],history:[]};
+let cur=null;
+try{const x=localStorage.getItem(K);if(x)S=JSON.parse(x)}catch(e){}
+if(!S.players)S.players=[];if(!S.history)S.history=[];
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const $=i=>document.getElementById(i);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const mode=()=>document.querySelector('input[name=m]:checked').value;
+
+function tab(n){$("p1").hidden=n!=1;$("p2").hidden=n!=2;$("t1").className=n==1?"on":"";$("t2").className=n==2?"on":"";if(n==2)stats();}
+$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
+
+function addP(){
+  const v=$("nm").value.trim();if(!v)return;
+  if(S.players.some(p=>p.name===v)){$("nm").select();return;}
+  S.players.push({name:v,pref:""});$("nm").value="";save();pl();
+}
+$("add").onclick=addP;
+$("nm").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.isComposing){e.preventDefault();addP();}});
+function pl(){
+  $("pl").innerHTML=S.players.map((p,i)=>`<span class="chip">${esc(p.name)}<select data-i="${i}"><option value="">希望なし</option>${R.map(r=>`<option${p.pref===r?" selected":""}>${r}</option>`).join("")}</select><button class="x" data-d="${i}">✕</button></span>`).join("");
+  $("cnt").textContent=`${S.players.length}人`+(S.players.length>10?"（10人まで）":"");
+}
+$("pl").addEventListener("change",e=>{if(e.target.dataset.i!=null){S.players[e.target.dataset.i].pref=e.target.value;save();}});
+$("pl").addEventListener("click",e=>{if(e.target.dataset.d!=null){S.players.splice(e.target.dataset.d,1);save();pl();}});
+
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+function assign(team,useRole){
+  if(!useRole)return team.map(p=>({name:p.name,role:""}));
+  const left=R.slice(),out=[],rest=[];
+  team.forEach(p=>{if(p.pref&&left.includes(p.pref)){out.push({name:p.name,role:p.pref});left.splice(left.indexOf(p.pref),1);}else rest.push(p);});
+  rest.forEach(p=>{const r=left.splice(Math.floor(Math.random()*left.length),1)[0];out.push({name:p.name,role:r});});
+  return out.sort((a,b)=>R.indexOf(a.role)-R.indexOf(b.role));
+}
+$("go").onclick=()=>{
+  if(S.players.length<2||S.players.length>10){$("res").innerHTML='<div class="card">2〜10人で実行してください。</div>';return;}
+  const ps=shuf(S.players.slice()),h=Math.ceil(ps.length/2),ur=mode()==="role";
+  cur={mode:ur?"role":"free",blue:assign(ps.slice(0,h),ur),red:assign(ps.slice(h),ur)};
+  show();
+};
+function slot(side,t){
+  return t.map((p,i)=>`<div class="slot"><div class="role">${p.role||"　"}</div><div><b>${esc(p.name)}</b></div>
+  <div class="in"><input data-s="${side}" data-i="${i}" data-f="champ" placeholder="チャンピオン" list="champs" style="flex:1;min-width:100px">
+  <input class="n" data-s="${side}" data-i="${i}" data-f="k" type="number" min="0" placeholder="K">
+  <input class="n" data-s="${side}" data-i="${i}" data-f="d" type="number" min="0" placeholder="D">
+  <input class="n" data-s="${side}" data-i="${i}" data-f="a" type="number" min="0" placeholder="A"></div></div>`).join("");
+}
+function show(){
+  $("res").innerHTML=`<div class="teams"><div class="team bl"><h3>ブルーサイド</h3>${slot("blue",cur.blue)}</div><div class="team rd"><h3>レッドサイド</h3>${slot("red",cur.red)}</div></div>
+  <div class="card" style="margin-top:14px"><div class="mu">試合後にチャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
+  <div class="row" style="margin-top:8px"><button class="b" data-w="blue">ブルー勝利で保存</button><button class="r" data-w="red">レッド勝利で保存</button></div></div>`;
+}
+$("res").addEventListener("click",e=>{
+  const w=e.target.dataset.w;if(!w||!cur)return;
+  const m={id:Date.now(),date:new Date().toISOString().slice(0,10),mode:cur.mode,winner:w,blue:cur.blue.map(x=>({...x})),red:cur.red.map(x=>({...x}))};
+  document.querySelectorAll("#res input[data-s]").forEach(el=>{
+    const p=m[el.dataset.s][el.dataset.i],f=el.dataset.f,v=el.value.trim();
+    if(f==="champ")p.champ=v;else p[f]=v===""?null:Number(v);
+  });
+  S.history.push(m);save();cur=null;
+  $("res").innerHTML='<div class="card">保存しました。「戦績」タブで確認できます。</div>';
+});
+
+function agg(){
+  const A={};
+  S.history.forEach(m=>["blue","red"].forEach(side=>m[side].forEach(p=>{
+    const a=A[p.name]||(A[p.name]={g:0,w:0,k:0,d:0,a:0,kg:0,ch:{},ro:{}});
+    a.g++;const win=m.winner===side;if(win)a.w++;
+    if(p.k!=null&&p.d!=null&&p.a!=null){a.k+=p.k;a.d+=p.d;a.a+=p.a;a.kg++;}
+    if(p.champ){const c=a.ch[p.champ]||(a.ch[p.champ]={g:0,w:0});c.g++;if(win)c.w++;}
+    if(p.role){const r=a.ro[p.role]||(a.ro[p.role]={g:0,w:0});r.g++;if(win)r.w++;}
+  })));
+  return A;
+}
+const pct=(w,g)=>g?Math.round(w/g*100)+"%":"-";
+function stats(){
+  const A=agg(),names=Object.keys(A).sort((a,b)=>A[b].g-A[a].g);
+  $("dt").hidden=true;
+  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>試合</th><th>勝</th><th>勝率</th><th>平均KDA</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細</div>`:'<div class="mu">まだ記録がありません。</div>';
+  const last=S.history.slice(-8).reverse();
+  $("hs").innerHTML=`試合履歴: ${S.history.length}件`+(last.length?`<br>`+last.map(m=>`${m.date} ${m.winner==="blue"?"ブルー":"レッド"}勝利`).join(" / "):"")+(S.history.length?`<br><button id="undo" style="margin-top:8px">直近の1試合を削除</button>`:"");
+}
+$("st").addEventListener("click",e=>{
+  const tr=e.target.closest("tr[data-n]");if(!tr)return;
+  const n=tr.dataset.n,a=agg()[n];
+  const rows=o=>Object.entries(o).sort((x,y)=>y[1].g-x[1].g).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.g}</td><td>${pct(v.w,v.g)}</td></tr>`).join("");
+  $("dt").hidden=false;
+  $("dt").innerHTML=`<h3 style="margin:0 0 8px">${esc(n)}</h3><div class="mu">合計 K${a.k} / D${a.d} / A${a.a}（入力があった${a.kg}試合）</div>
+  <h4>ピックチャンピオン</h4>${Object.keys(a.ch).length?`<div class="tw"><table><tr><th>チャンプ</th><th>試合</th><th>勝率</th></tr>${rows(a.ch)}</table></div>`:'<div class="mu">記録なし</div>'}
+  <h4>ロール別</h4>${Object.keys(a.ro).length?`<div class="tw"><table><tr><th>ロール</th><th>試合</th><th>勝率</th></tr>${rows(a.ro)}</table></div>`:'<div class="mu">記録なし</div>'}`;
+});
+$("hs").addEventListener("click",e=>{if(e.target.id==="undo"&&confirm("直近の試合を削除しますか？")){S.history.pop();save();stats();}});
+pl();
+</script></body></html>
