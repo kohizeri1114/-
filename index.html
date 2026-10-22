@@ -34,7 +34,7 @@ input,select{border:1px solid var(--bd);background:var(--bg);border-radius:8px;p
 .slot .in input{width:100%}
 .slot .in input.n{width:54px;padding:6px}
 .tw{overflow-x:auto}
-#pn summary{cursor:pointer;font-weight:700}#pn h4{margin:14px 0 4px}#pn ul{margin:4px 0 8px;padding-left:20px}#pn li{margin:2px 0}
+#pn summary{cursor:pointer;font-weight:700}#pn h4{margin:14px 0 2px}#pn .ph{font-weight:700;margin-top:12px}#pn ul{list-style:none;margin:4px 0 0;padding-left:1.4em}#pn li{margin:3px 0;padding-left:1em;text-indent:-1em}#pn li::before{content:"・"}
 .sw{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .sw input{position:absolute;opacity:0;width:0;height:0;padding:0;border:0}
 .sw i{position:relative;width:40px;height:22px;border-radius:999px;background:var(--bd);transition:.15s;flex:none}
@@ -109,28 +109,35 @@ const RATE={start:1000,win:10,kda:5,kdaBase:2.5,elo:true,eloScale:400,kdaRole:{T
 // ▼ パッチノート。新しい版は配列の先頭に追加する（sec は [見出し, [項目...]] の並び）
 const PATCH=[
  {v:"1.1.0",date:"2026-10-22",sec:[
-  ["新機能",[
-   "【レート】プレイヤーごとのカスタムレートを追加。初期1000、勝てば+10・負ければ-10が基本。",
-   "【レート】相手チームの強さで増減が変わるように（格上に勝つと大きく増え、格下に負けると大きく減る）。",
-   "【レート】KDAによる補正を追加。ロールごとの基準KDAと比べて最大±5。サポートは基準が高め。",
-   "【チーム分け】「レートバランス」を追加。両チームの平均レートが近くなる組み合わせを選ぶ。",
-   "【チーム分け】希望サイド（ブルー／レッド／観戦）と「優先出場」を追加。",
-   "【チーム分け】11人以上のとき、10人をランダムに選び、残りを観戦者に。",
-   "【団体】LTK・WCSのように団体ごとに参加者と戦績を分けて管理できるように。",
-   "【戦績】連勝・連敗の表示と、最大連勝・最大連敗を追加。",
-   "【戦績】味方のとき・敵のときの勝率（相性）を、プレイヤーの詳細に追加。",
-   "【履歴】試合ごとの履歴を追加。チャンピオン・KDAの修正、勝敗の変更、試合の削除ができる。",
-   "【履歴】プレイヤー・チャンピオン・期間・ロール有無での絞り込みを追加。",
-   "【設定】メンバー名の変更を追加。過去の戦績の名前もまとめて変わる。",
-   "【設定】戦績のJSON書き出し・読み込みを追加。",
-   "【入力】チャンピオン名・KDAをEnterや十字キーで次の欄へ移動できるように。",
-   "【入力】プレイヤー名・チャンピオン名の予測変換を追加。",
-   "【その他】画面上部に流れるアナウンスと、このパッチノートを追加。"]],
-  ["変更・改善",[
-   "画面を「チーム分け／戦績／履歴／設定」の4つのタブに整理。",
-   "「ロール指定」をスイッチ式に変更。",
-   "戦績の表をレート順の並びに変更。",
-   "保存形式を団体に対応したものに変更。1.0.0までのデータは「デフォルト」団体に自動で引き継がれる。"]]
+  ["レート",[
+   "プレイヤーごとのカスタムレートを追加。初期1000、勝てば+10・負ければ-10が基本。",
+   "相手チームの強さで増減が変わるように。格上に勝つと大きく増え、格下に負けると大きく減る。",
+   "KDAによる補正を追加。ロールごとの基準KDAと比べて最大±5。サポートは基準が高め。",
+   "履歴に、試合ごとの各プレイヤーのレート増減を表示。",
+   "戦績の表を、レート順の並びに変更。"]],
+  ["チーム分け",[
+   "「レートバランス」を追加。両チームの平均レートが近くなる組み合わせを選ぶ。",
+   "希望サイド（ブルー／レッド／観戦）と「優先出場」を追加。",
+   "11人以上のとき、10人をランダムに選び、残りを観戦者に。",
+   "「ロール指定」をスイッチ式に変更。"]],
+  ["団体",[
+   "LTK・WCSのように、団体ごとに参加者と戦績を分けて管理できるように。",
+   "保存形式を団体対応に変更。1.0.0までのデータは「デフォルト」団体に自動で引き継がれる。"]],
+  ["戦績",[
+   "連勝・連敗の表示と、最大連勝・最大連敗を追加。",
+   "味方のとき・敵のときの勝率（相性）を、プレイヤーの詳細に追加。"]],
+  ["履歴",[
+   "試合ごとの履歴を追加。チャンピオン・KDAの修正、勝敗の変更、試合の削除ができる。",
+   "プレイヤー・チャンピオン・期間・ロール有無での絞り込みを追加。"]],
+  ["設定",[
+   "メンバー名の変更を追加。過去の戦績の名前もまとめて変わる。",
+   "戦績のJSON書き出し・読み込みを追加。"]],
+  ["入力",[
+   "チャンピオン名・KDAを、Enterや十字キーで次の欄へ移動できるように。",
+   "プレイヤー名・チャンピオン名の予測変換を追加。"]],
+  ["画面",[
+   "「チーム分け／戦績／履歴／設定」の4つのタブに整理。",
+   "上部に流れるアナウンスと、このパッチノートを追加。"]]
  ]}
 ];
 const R=["TOP","JG","MID","ADC","SUP"];
@@ -350,7 +357,7 @@ $("rn").onclick=()=>{
 $("swr").checked=!!(DB.opt&&DB.opt.r);$("swb").checked=!!(DB.opt&&DB.opt.b);
 ["swr","swb"].forEach(i=>$(i).onchange=()=>{DB.opt={r:$("swr").checked,b:$("swb").checked};save();});
 (()=>{if(!PATCH.length){$("pn").hidden=true;return;}$("pns").textContent="📝 ver"+PATCH[0].v+" パッチノート";
-  $("pnb").innerHTML=PATCH.map(r=>`<h4>ver${esc(r.v)}　<span class="mu">${esc(r.date||"")}</span></h4>`+r.sec.map(([t,l])=>`<div class="mu"><b>${esc(t)}</b></div><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")).join("");})();
+  $("pnb").innerHTML=PATCH.map(r=>`<h4>ver${esc(r.v)}　<span class="mu">${esc(r.date||"")}</span></h4>`+r.sec.map(([t,l])=>`<div class="ph">【${esc(t)}】</div><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")).join("");})();
 (()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!t)return;$("annt").textContent=t;$("annt").style.setProperty("--d",Math.max(15,t.length*ANNOUNCE_SPEED)+"s");$("ann").hidden=false;})();
 pl();gl();
 </script></body></html>
