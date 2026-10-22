@@ -1017,7 +1017,14 @@ $("swr").checked=!!(DB.opt&&DB.opt.r);$("swb").checked=!!(DB.opt&&DB.opt.b);
     </details>
   `).join("");
 })();
-(()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!ANNOUNCE.filter(Boolean).length)return;$("annt").textContent=ANNOUNCE.filter(Boolean).join("　　　◆　　　");$("annt").style.setProperty("--d",Math.max(15,ANNOUNCE.filter(Boolean).join("　　　◆　　{t}");$("ann").hidden=false;})();
+(()=>{
+  const list = ANNOUNCE.filter(Boolean);
+  if(!list.length) return;
+  const t = list.join("　　　◆　　　");
+  $("annt").textContent = t;
+  $("annt").style.setProperty("--d", Math.max(15, t.length * ANNOUNCE_SPEED) + "s");
+  $("ann").hidden = false;
+})();
 pl();gl();
 </script>
 </body>
