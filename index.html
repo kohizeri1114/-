@@ -180,6 +180,10 @@ button.r {
   color: #fff;
 }
 button.r:hover { background: #f85149; }
+button.sm {
+  padding: 2px 6px;
+  font-size: 11px;
+}
 
 input[type=text], input[type=number], select {
   border: 1px solid var(--bd);
@@ -297,6 +301,12 @@ input[type=text]:focus, input[type=number]:focus, select:focus {
   border-radius: var(--radius);
   border: 1px solid var(--bd);
 }
+.slot-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
 .role-sel {
   font-size: 11px;
   font-weight: 700;
@@ -311,6 +321,16 @@ input[type=text]:focus, input[type=number]:focus, select:focus {
 }
 .role-sel:focus {
   border-color: var(--bd-focus);
+}
+.team-mv-sel {
+  font-size: 11px;
+  color: var(--tx-sub);
+  background: var(--bg-sub);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
 }
 .slot .in {
   display: flex;
@@ -580,6 +600,7 @@ const PATCH=[
    "ヘッダータイトル横の不要なアイコンを撤去。",
    "タブ・チーム名・テキスト等から絵文字をすべて除外。"]],
   ["チーム分け & 試合履歴",[
+   "チーム分け実行後に、プレイヤーを「ブルー ⇔ レッド ⇔ 観戦」へ自由に変更・移動できる機能を追加。",
    "チーム分け結果画面および試合履歴画面で、ロールを後から自由に変更・指定できるドロップダウンを追加。",
    "試合履歴の「年月日（日付）」による絞り込み欄を削除し、UIを簡素化。"]],
   ["戦績・グラフ",[
@@ -659,34 +680,93 @@ $("go").onclick=()=>{
   cur={mode:ur?"role":"free",blue:assign(B,ur),red:assign(Rd,ur),spec:spec.map(p=>p.name),bal:info};
   show();
 };
+
+function syncCurInputs(){
+  if(!cur)return;
+  document.querySelectorAll("#res [data-s]").forEach(el=>{
+    const sd=el.dataset.s, i=el.dataset.i, f=el.dataset.f;
+    if(cur[sd] && cur[sd][i]){
+      const v=el.value.trim();
+      if(f==="champ"||f==="role") cur[sd][i][f]=v;
+      else cur[sd][i][f]=v===""?null:Number(v);
+    }
+  });
+}
+
 function slot(side,t){
   return t.map((p,i)=>`<div class="slot">
     <select class="role-sel" data-s="${side}" data-i="${i}" data-f="role">
       <option value=""${!p.role?" selected":""}>FREE</option>
       ${R.map(r=>`<option value="${r}"${p.role===r?" selected":""}>${r}</option>`).join("")}
     </select>
-    <div><b>${esc(p.name)}</b></div>
+    <div class="slot-top">
+      <b>${esc(p.name)}</b>
+      <select class="team-mv-sel" data-mv-side="${side}" data-mv-i="${i}">
+        <option value="blue"${side==="blue"?" selected":""}>ブルー</option>
+        <option value="red"${side==="red"?" selected":""}>レッド</option>
+        <option value="spec">観戦へ</option>
+      </select>
+    </div>
     <div class="in">
-      <input data-s="${side}" data-i="${i}" data-f="champ" placeholder="チャンピオン" list="champs" style="flex:1;min-width:100px">
-      <input class="n" data-s="${side}" data-i="${i}" data-f="k" type="number" min="0" placeholder="K">
-      <input class="n" data-s="${side}" data-i="${i}" data-f="d" type="number" min="0" placeholder="D">
-      <input class="n" data-s="${side}" data-i="${i}" data-f="a" type="number" min="0" placeholder="A">
+      <input data-s="${side}" data-i="${i}" data-f="champ" placeholder="チャンピオン" value="${esc(p.champ||"")}" list="champs" style="flex:1;min-width:100px">
+      <input class="n" data-s="${side}" data-i="${i}" data-f="k" type="number" min="0" placeholder="K" value="${p.k!=null?p.k:""}">
+      <input class="n" data-s="${side}" data-i="${i}" data-f="d" type="number" min="0" placeholder="D" value="${p.d!=null?p.d:""}">
+      <input class="n" data-s="${side}" data-i="${i}" data-f="a" type="number" min="0" placeholder="A" value="${p.a!=null?p.a:""}">
     </div>
   </div>`).join("");
 }
+
+function specListHTML(spec){
+  if(!spec || !spec.length) return "";
+  return `<div class="card" style="margin-top:12px">
+    <b>観戦</b>:
+    ${spec.map((name, i)=>`<span class="chip">${esc(name)}
+      <button class="sm b" data-spec-to="blue" data-spec-i="${i}">+ブルー</button>
+      <button class="sm r" data-spec-to="red" data-spec-i="${i}">+レッド</button>
+    </span>`).join(" ")}
+  </div>`;
+}
+
 function show(){
   $("res").innerHTML=`<div class="teams"><div class="team bl"><h3>ブルーサイド</h3>${slot("blue",cur.blue)}</div><div class="team rd"><h3>レッドサイド</h3>${slot("red",cur.red)}</div></div>
-  ${cur.bal?`<div class="mu" style="margin-top:10px;font-weight:600">[バランス] ${esc(cur.bal)}</div>`:""}${cur.spec&&cur.spec.length?`<div class="card" style="margin-top:12px"><b>観戦</b>: ${cur.spec.map(esc).join("、")}</div>`:""}<div class="card" style="margin-top:12px"><div class="mu">試合後にロール・チャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
+  ${cur.bal?`<div class="mu" style="margin-top:10px;font-weight:600">[バランス] ${esc(cur.bal)}</div>`:""}
+  ${specListHTML(cur.spec)}
+  <div class="card" style="margin-top:12px"><div class="mu">試合後にロール・チャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
   <div class="row" style="margin-top:10px"><button class="b" data-w="blue">ブルー勝利で保存</button><button class="r" data-w="red">レッド勝利で保存</button></div></div>`;
 }
+
+$("res").addEventListener("change",e=>{
+  if(e.target.dataset.mvSide!=null){
+    syncCurInputs();
+    const fromSide=e.target.dataset.mvSide;
+    const idx=Number(e.target.dataset.mvI);
+    const toSide=e.target.value;
+    if(fromSide===toSide) return;
+
+    const [p]=cur[fromSide].splice(idx,1);
+    if(toSide==="spec"){
+      cur.spec.push(p.name);
+    } else {
+      cur[toSide].push(p);
+    }
+    show();
+  }
+});
+
 $("res").addEventListener("click",e=>{
+  if(e.target.dataset.specTo!=null){
+    syncCurInputs();
+    const toSide=e.target.dataset.specTo;
+    const idx=Number(e.target.dataset.specI);
+    const name=cur.spec.splice(idx, 1)[0];
+    cur[toSide].push({name, role:"", champ:"", k:null, d:null, a:null});
+    show();
+    return;
+  }
+
   const w=e.target.dataset.w;if(!w||!cur)return;
+  syncCurInputs();
   const m={id:Date.now(),date:new Date().toISOString().slice(0,10),mode:cur.mode,winner:w,blue:cur.blue.map(x=>({...x})),red:cur.red.map(x=>({...x}))};
-  document.querySelectorAll("#res [data-s]").forEach(el=>{
-    const p=m[el.dataset.s][el.dataset.i],f=el.dataset.f,v=el.value.trim();
-    if(f==="champ"||f==="role")p[f]=v;
-    else p[f]=v===""?null:Number(v);
-  });
   S.history.push(m);save();cur=null;gl();dl();
   $("res").innerHTML='<div class="card">保存しました。「戦績」タブで確認できます。</div>';
 });
@@ -937,7 +1017,7 @@ $("swr").checked=!!(DB.opt&&DB.opt.r);$("swb").checked=!!(DB.opt&&DB.opt.b);
     </details>
   `).join("");
 })();
-(()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!ANNOUNCE.filter(Boolean).length)return;$("annt").textContent=ANNOUNCE.filter(Boolean).join("　　　◆　　　");$("annt").style.setProperty("--d",Math.max(15,ANNOUNCE.filter(Boolean).join("　　　◆ $nbsp;　").length*ANNOUNCE_SPEED)+"s");$("ann").hidden=false;})();
+(()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!ANNOUNCE.filter(Boolean).length)return;$("annt").textContent=ANNOUNCE.filter(Boolean).join("　　　◆　　　");$("annt").style.setProperty("--d",Math.max(15,ANNOUNCE.filter(Boolean).join("　　　◆　　{t}");$("ann").hidden=false;})();
 pl();gl();
 </script>
 </body>
