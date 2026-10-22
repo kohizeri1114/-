@@ -45,8 +45,8 @@ details.mt{border-bottom:1px solid var(--bd);padding:6px 0}details.mt summary{cu
 tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 </style></head><body><div id="ann" class="ann" hidden><div id="annt" class="annt"></div></div><div class="w">
 <h1>ろるぱーくカスタム管理アプリ</h1>
-<div class="card"><div class="row"><b>団体</b><select id="gs"></select><input id="gn" type="text" placeholder="団体名（例: LTK）" maxlength="20"><button id="ga">追加</button><button id="gr">名前変更</button><button id="gd">削除</button></div><div class="mu" id="gm" style="margin-top:6px">団体ごとに参加者・戦績が別管理されます。</div></div>
-<div class="tabs"><button id="t1" class="on">チーム分け</button><button id="t2">戦績</button></div>
+<div class="row" style="margin-bottom:12px"><b>団体</b><select id="gs"></select></div>
+<div class="tabs"><button id="t1" class="on">チーム分け</button><button id="t2">戦績</button><button id="t3">履歴</button><button id="t4">設定</button></div>
 
 <div id="p1">
   <div class="card">
@@ -68,7 +68,14 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 <div id="p2" hidden>
   <div class="card"><div class="tw" id="st"></div></div>
   <div class="card" id="dt" hidden></div>
-  <div class="card"><b>試合ごとの履歴</b><div class="mu" id="mm">開いて、チャンピオン・KDAの修正、勝敗の変更、削除ができます。</div><div id="mh" style="margin-top:8px"></div></div>
+</div>
+<div id="p3" hidden>
+  <div class="card"><div class="row"><select id="fp"></select><input id="fc" type="text" list="champs" placeholder="チャンピオン" style="max-width:150px"><input id="ff" type="date"><span class="mu">〜</span><input id="ft" type="date"><select id="fm"><option value="">ロール有無</option><option value="role">ロールあり</option><option value="free">ロールなし</option></select><button id="fx">クリア</button></div><div class="mu" id="fn" style="margin-top:6px"></div></div>
+  <div class="card"><div class="mu" id="mm">開いて、チャンピオン・KDAの修正、勝敗の変更、削除ができます。</div><div id="mh" style="margin-top:8px"></div></div>
+</div>
+<div id="p4" hidden>
+  <div class="card"><b>団体の管理</b><div class="row" style="margin-top:8px"><input id="gn" type="text" placeholder="団体名（例: LTK）" maxlength="20"><button id="ga">追加</button><button id="gr">名前変更</button><button id="gd">削除</button></div><div class="mu" id="gm" style="margin-top:6px">団体ごとに参加者・戦績が別管理されます。切り替えは画面上部の「団体」で行います。</div></div>
+  <div class="card"><b>メンバー名の変更</b><div class="row" style="margin-top:8px"><select id="ro"></select><span class="mu">→</span><input id="rv" type="text" placeholder="新しい名前" maxlength="20"><button id="rn">変更</button></div><div class="mu" id="rm" style="margin-top:6px">過去の戦績の名前もまとめて変わります。すでにある名前にすると統合されます。</div></div>
   <div class="card"><div class="row"><button id="ex">JSONを書き出し</button><label class="mu">読み込み: <input id="im" type="file" accept=".json,application/json"></label></div>
   <details id="io" style="margin-top:8px"><summary class="mu">テキストでコピー／貼り付け</summary><textarea id="ta" rows="6" style="width:100%;margin-top:6px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:6px"><button id="sh">現在のデータを表示</button><button id="ld">貼り付けた内容を読み込む</button></div></details>
   <div class="mu" id="msg" style="margin-top:6px">読み込みは既存データに追加されます（同じ試合は重複しません）</div></div>
@@ -98,8 +105,8 @@ const $=i=>document.getElementById(i);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const mode=()=>document.querySelector('input[name=m]:checked').value;
 
-function tab(n){$("p1").hidden=n!=1;$("p2").hidden=n!=2;$("t1").className=n==1?"on":"";$("t2").className=n==2?"on":"";if(n==2)stats();}
-$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
+function tab(n){for(let i=1;i<=4;i++){$("p"+i).hidden=i!=n;$("t"+i).className=i==n?"on":"";}if(n>1)stats();}
+[1,2,3,4].forEach(i=>$("t"+i).onclick=()=>tab(i));
 
 function addP(){
   const v=$("nm").value.trim();if(!v)return;
@@ -162,8 +169,8 @@ $("res").addEventListener("click",e=>{
 function agg(){
   const A={};
   S.history.forEach(m=>["blue","red"].forEach(side=>m[side].forEach(p=>{
-    const a=A[p.name]||(A[p.name]={g:0,w:0,k:0,d:0,a:0,kg:0,ch:{},ro:{}});
-    a.g++;const win=m.winner===side;if(win)a.w++;
+    const a=A[p.name]||(A[p.name]={g:0,w:0,k:0,d:0,a:0,kg:0,ch:{},ro:{},res:[]});
+    a.g++;const win=m.winner===side;if(win)a.w++;a.res.push(win);
     if(p.k!=null&&p.d!=null&&p.a!=null){a.k+=p.k;a.d+=p.d;a.a+=p.a;a.kg++;}
     if(p.champ){const c=a.ch[p.champ]||(a.ch[p.champ]={g:0,w:0});c.g++;if(win)c.w++;}
     if(p.role){const r=a.ro[p.role]||(a.ro[p.role]={g:0,w:0});r.g++;if(win)r.w++;}
@@ -171,24 +178,31 @@ function agg(){
   return A;
 }
 let openId=null,delArm=null;
+function stk(r){let run=0,last=null,bw=0,bl=0;r.forEach(x=>{if(x===last)run++;else{run=1;last=x;}if(x)bw=Math.max(bw,run);else bl=Math.max(bl,run);});return{cur:r.length?(last?run:-run):0,bw,bl};}
+function stkT(r){const c=stk(r).cur;return c>=2?`<span style="color:var(--bl)">${c}連勝</span>`:c<=-2?`<span style="color:var(--rd)">${-c}連敗</span>`:"-";}
+function pairs(n){const al={},en={};S.history.forEach(m=>{const sd0=m.blue.some(p=>p.name===n)?"blue":m.red.some(p=>p.name===n)?"red":null;if(!sd0)return;const win=m.winner===sd0;["blue","red"].forEach(sd=>m[sd].forEach(p=>{if(p.name===n)return;const o=sd===sd0?al:en,c=o[p.name]||(o[p.name]={g:0,w:0});c.g++;if(win)c.w++;}));});return{al,en};}
+function fillP(){const set=new Set();S.history.forEach(m=>[...m.blue,...m.red].forEach(p=>set.add(p.name)));const c=$("fp").value;$("fp").innerHTML='<option value="">全員</option>'+[...set].map(n=>`<option${n===c?" selected":""}>${esc(n)}</option>`).join("");}
+function fillRo(){const set=new Set(S.players.map(p=>p.name));S.history.forEach(m=>[...m.blue,...m.red].forEach(p=>set.add(p.name)));const c=$("ro").value;$("ro").innerHTML='<option value="">変更する人</option>'+[...set].map(n=>`<option${n===c?" selected":""}>${esc(n)}</option>`).join("");}
+function pass(m,F){const ps=[...m.blue,...m.red];return(!F.f||m.date>=F.f)&&(!F.t||m.date<=F.t)&&(!F.m||m.mode===F.m)&&(!F.p&&!F.c||ps.some(x=>(!F.p||x.name===F.p)&&(!F.c||(x.champ||"").includes(F.c))));}
 function mh(){
   const side=(t,sd)=>t.map((p,i)=>`<div class="slot"><div class="role">${p.role||"　"}</div><div><b>${esc(p.name)}</b></div><div class="in"><input data-f="champ" data-s="${sd}" data-i="${i}" placeholder="チャンピオン" value="${esc(p.champ||"")}" style="flex:1;min-width:100px">${["k","d","a"].map(f=>`<input class="n" data-f="${f}" data-s="${sd}" data-i="${i}" type="number" min="0" placeholder="${f.toUpperCase()}" value="${p[f]==null?"":p[f]}">`).join("")}</div></div>`).join("");
-  const L=S.history.slice().reverse();
+  fillP();const F={p:$("fp").value,c:$("fc").value.trim(),f:$("ff").value,t:$("ft").value,m:$("fm").value},L=S.history.filter(m=>pass(m,F)).reverse();$("fn").textContent=L.length+" / "+S.history.length+"試合";
   $("mh").innerHTML=L.length?L.map(m=>`<details class="mt" data-id="${m.id}"${m.id===openId?" open":""}><summary>${esc(m.date)}　<b style="color:var(--${m.winner==="blue"?"bl":"rd"})">${m.winner==="blue"?"ブルー":"レッド"}勝利</b>　<span class="mu">${m.mode==="role"?"ロールあり":"ロールなし"}</span></summary><div class="teams" style="margin:8px 0"><div class="team bl"><h3>ブルー</h3>${side(m.blue,"blue")}</div><div class="team rd"><h3>レッド</h3>${side(m.red,"red")}</div></div><div class="row" style="margin-bottom:6px"><button class="pri" data-a="save">変更を保存</button><button data-a="flip">勝敗を逆にする</button><button class="r" data-a="del">削除</button></div></details>`).join(""):'<div class="mu">まだ記録がありません。</div>';
 }
 const pct=(w,g)=>g?Math.round(w/g*100)+"%":"-";
-function stats(){gl();mh();dl();
+function stats(){gl();mh();dl();fillRo();
   const A=agg(),names=Object.keys(A).sort((a,b)=>A[b].g-A[a].g);
   $("dt").hidden=true;
-  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>試合</th><th>勝</th><th>勝率</th><th>平均KDA</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細</div>`:'<div class="mu">まだ記録がありません。</div>';
+  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>試合</th><th>勝</th><th>勝率</th><th>平均KDA</th><th>連続</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td><td>${stkT(a.res)}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細</div>`:'<div class="mu">まだ記録がありません。</div>';
 }
 $("st").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-n]");if(!tr)return;
-  const n=tr.dataset.n,a=agg()[n];
+  const n=tr.dataset.n,a=agg()[n],sk=stk(a.res),P=pairs(n),tb=o=>Object.keys(o).length?`<div class="tw"><table><tr><th>相手</th><th>試合</th><th>勝率</th></tr>${rows(o)}</table></div>`:'<div class="mu">記録なし</div>';
   const rows=o=>Object.entries(o).sort((x,y)=>y[1].g-x[1].g).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.g}</td><td>${pct(v.w,v.g)}</td></tr>`).join("");
   $("dt").hidden=false;
-  $("dt").innerHTML=`<h3 style="margin:0 0 8px">${esc(n)}</h3><div class="mu">合計 K${a.k} / D${a.d} / A${a.a}（入力があった${a.kg}試合）</div>
+  $("dt").innerHTML=`<h3 style="margin:0 0 8px">${esc(n)}</h3><div class="mu">合計 K${a.k} / D${a.d} / A${a.a}（入力があった${a.kg}試合）</div><div class="mu">最大 ${sk.bw}連勝 / ${sk.bl}連敗</div>
   <h4>ピックチャンピオン</h4>${Object.keys(a.ch).length?`<div class="tw"><table><tr><th>チャンプ</th><th>試合</th><th>勝率</th></tr>${rows(a.ch)}</table></div>`:'<div class="mu">記録なし</div>'}
+  <h4>味方のときの勝率</h4>${tb(P.al)}<h4>敵のときの勝率</h4>${tb(P.en)}
   <h4>ロール別</h4>${Object.keys(a.ro).length?`<div class="tw"><table><tr><th>ロール</th><th>試合</th><th>勝率</th></tr>${rows(a.ro)}</table></div>`:'<div class="mu">記録なし</div>'}`;
 });
 function data(){return JSON.stringify({app:"lol-team-splitter",v:2,group:S.name,players:S.players,history:S.history},null,1);}
@@ -265,6 +279,19 @@ document.addEventListener("keydown",e=>{
   if(k!=="Enter")e.preventDefault();
   setTimeout(()=>{const n=L[j];if(n){n.focus();n.select();}},0);
 });
+["fp","fc","ff","ft","fm"].forEach(i=>$(i).addEventListener("input",mh));
+$("fx").onclick=()=>{["fp","fc","ff","ft","fm"].forEach(i=>$(i).value="");mh();};
+$("rn").onclick=()=>{
+  const o=$("ro").value,n=$("rv").value.trim(),r=$("rm");
+  if(!o||!n){r.textContent="変更する人と新しい名前を入力してください。";return;}
+  if(o===n){r.textContent="同じ名前です。";return;}
+  if(S.history.some(m=>{const x=[...m.blue,...m.red].map(p=>p.name);return x.includes(o)&&x.includes(n);})){r.textContent="同じ試合に両方の名前があるため統合できません。";return;}
+  const merged=S.players.some(p=>p.name===n)||S.history.some(m=>[...m.blue,...m.red].some(p=>p.name===n));
+  S.history.forEach(m=>[...m.blue,...m.red].forEach(p=>{if(p.name===o)p.name=n;}));
+  const po=S.players.find(p=>p.name===o);
+  if(po){if(S.players.some(p=>p.name===n))S.players=S.players.filter(p=>p!==po);else po.name=n;}
+  save();pl();stats();$("rv").value="";r.textContent="「"+o+"」を「"+n+"」に"+(merged?"統合":"変更")+"しました。";
+};
 (()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!t)return;$("annt").textContent=t;$("annt").style.setProperty("--d",Math.max(15,t.length*ANNOUNCE_SPEED)+"s");$("ann").hidden=false;})();
 pl();gl();
 </script></body></html>
