@@ -424,13 +424,16 @@ tr.cl:hover { background: var(--card-hover); }
   fill: #8b949e;
 }
 
-/* Accordion */
+/* Accordion & Patch Notes */
 #pn summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--tx-sub); }
-#pn h4 { margin: 10px 0 4px; color: var(--tx); font-size: 13px; }
-#pn .ph { font-weight: 700; margin-top: 8px; color: #58a6ff; font-size: 12px; }
-#pn ul { list-style: none; margin: 4px 0 0; padding-left: 1em; }
-#pn li { margin: 2px 0; color: var(--tx-sub); font-size: 12px; }
-#pn li::before { content: "- "; color: var(--tx-mu); }
+.patch-ver { margin-top: 8px; border-top: 1px solid var(--bd); padding-top: 8px; }
+.patch-ver:first-child { border-top: none; padding-top: 4px; }
+.patch-ver summary { cursor: pointer; font-weight: 700; font-size: 13px; color: #58a6ff; }
+.patch-body { padding: 4px 0 0 8px; }
+.patch-body .ph { font-weight: 700; margin-top: 6px; color: #f0f6fc; font-size: 12px; }
+.patch-body ul { list-style: none; margin: 4px 0 0; padding-left: 1em; }
+.patch-body li { margin: 2px 0; color: var(--tx-sub); font-size: 12px; }
+.patch-body li::before { content: "- "; color: var(--tx-mu); }
 
 details.mt { border-bottom: 1px solid var(--bd); padding: 8px 0; }
 details.mt summary { cursor: pointer; font-weight: 600; }
@@ -450,8 +453,8 @@ details.mt summary { cursor: pointer; font-weight: 600; }
   </div>
 
   <details class="card" id="pn">
-    <summary id="pns"></summary>
-    <div id="pnb"></div>
+    <summary id="pns">パッチノート</summary>
+    <div id="pnb" style="margin-top:6px"></div>
   </details>
 
   <div class="tabs">
@@ -562,7 +565,7 @@ details.mt summary { cursor: pointer; font-weight: 600; }
 <script>
 // ▼ 上部に流れるアナウンス
 const ANNOUNCE=[
-  "ろるぱーくカスタム管理アプリ ver1.1.0",
+  "ろるぱーくカスタム管理アプリ ver2.0.0",
   "試合後はチャンピオンとKDAを入力して、勝敗を保存しよう",
   "欲しい機能があったらつよしにDMしてね",
   "【実績】『逆ドラゴンスレイヤー』...どな",
@@ -570,37 +573,40 @@ const ANNOUNCE=[
 const ANNOUNCE_SPEED=0.35;
 const RATE={start:1000,win:10,kda:5,kdaBase:2.5,elo:true,eloScale:400,kdaRole:{TOP:2.5,JG:3,MID:3,ADC:3,SUP:3.5}};
 const PATCH=[
- {v:"1.1.0",date:"2026-10-22",sec:[
+ {v:"2.0.0",date:"2026-10-22",sec:[
+  ["デザイン（UI全面改修）",[
+   "グラデーションやネオン調シャドウを廃止し、GitHub Dark風の硬派なダークUIへ全面見直し。",
+   "アナウンス帯の角丸を解除し、画面幅いっぱいのフラットデザインに変更。",
+   "ヘッダータイトル横の不要なアイコンを撤去。",
+   "タブ・チーム名・テキスト等から絵文字をすべて除外。"]],
+  ["チーム分け & 試合履歴",[
+   "チーム分け結果画面および試合履歴画面で、ロールを後から自由に変更・指定できるドロップダウンを追加。",
+   "試合履歴の「年月日（日付）」による絞り込み欄を削除し、UIを簡素化。"]],
+  ["戦績・グラフ",[
+   "レート推移グラフの点にカーソルを乗せた際、遅延なしで即座にツールチップが表示されるように改修。",
+   "ツールチップ内に「試合番号」「レート増減」「プレイしたロール」「ピックチャンピオン」「KDA」の超詳細情報を一覧表示。"]]
+ ]},
+ {v:"1.1.0",date:"2026-10-21",sec:[
   ["レート",[
    "プレイヤーごとのカスタムレートを追加。初期1000、勝てば+10・負ければ-10が基本。",
    "相手チームの強さで増減が変わるように。格上に勝つと大きく増え、格下に負けると大きく減る。",
-   "KDAによる補正を追加。ロールごとの基準KDAと比べて最大±5。サポートは基準が高め。",
-   "戦績の詳細画面にレートの推移グラフ表示を追加（ホバーでレート/ロール/チャンプ/KDAを表示）。",
+   "KDAによる補正を追加。ロールごとの基準KDAと比べて最大±5。",
+   "戦績の詳細画面にレートの推移グラフ表示を追加。",
    "履歴に、試合ごとの各プレイヤーのレート増減を表示。",
    "戦績の表を、レート順の並びに変更。"]],
   ["チーム分け",[
    "「レートバランス」を追加。両チームの平均レートが近くなる組み合わせを選ぶ。",
    "希望サイド（ブルー／レッド／観戦）と「優先出場」を追加。",
    "11人以上のとき、10人をランダムに選び、残りを観戦者に。",
-   "「ロール指定」をスイッチ式に変更。チーム分け後もロール変更が可能に。"]],
+   "「ロール指定」をスイッチ式に変更。"]],
   ["団体",[
-   "LTK・WCSのように、団体ごとに参加者と戦績を分けて管理できるように。",
-   "保存形式を団体対応に変更。1.0.0までのデータは「デフォルト」団体に自動で引き継がれる。"]],
+   "LTK・WCSのように、団体ごとに参加者と戦績を分けて管理できるように。"]],
   ["戦績",[
    "連勝・連敗の表示と、最大連勝・最大連敗を追加。",
    "味方のとき・敵のときの勝率（相性）を、プレイヤーの詳細に追加。"]],
-  ["履歴",[
-   "試合ごとの履歴を追加。ロール・チャンピオン・KDAの修正、勝敗の変更、試合の削除ができる。",
-   "プレイヤー・チャンピオン・ロール有無での絞り込みを追加。"]],
   ["設定",[
    "メンバー名の変更を追加。過去の戦績の名前もまとめて変わる。",
-   "戦績のJSON書き出し・読み込みを追加。"]],
-  ["入力",[
-   "チャンピオン名・KDAを、Enterや十字キーで次の欄へ移動できるように。",
-   "プレイヤー名・チャンピオン名の予測変換を追加。"]],
-  ["画面",[
-   "「チーム分け／戦績／履歴／設定」の4つのタブに整理。",
-   "上部に流れるアナウンスと、このパッチノートを追加。"]]
+   "戦績のJSON書き出し・読み込みを追加。"]]
  ]}
 ];
 const R=["TOP","JG","MID","ADC","SUP"];
@@ -919,9 +925,19 @@ $("rn").onclick=()=>{
 };
 $("swr").checked=!!(DB.opt&&DB.opt.r);$("swb").checked=!!(DB.opt&&DB.opt.b);
 ["swr","swb"].forEach(i=>$(i).onchange=()=>{DB.opt={r:$("swr").checked,b:$("swb").checked};save();});
-(()=>{if(!PATCH.length){$("pn").hidden=true;return;}$("pns").textContent="パッチノート ver"+PATCH[0].v;
-  $("pnb").innerHTML=PATCH.map(r=>`<h4>ver${esc(r.v)}　<span class="mu">${esc(r.date||"")}</span></h4>`+r.sec.map(([t,l])=>`<div class="ph">【${esc(t)}】</div><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")).join("");})();
-(()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!ANNOUNCE.filter(Boolean).length)return;$("annt").textContent=ANNOUNCE.filter(Boolean).join("　　　◆　　　");$("annt").style.setProperty("--d",Math.max(15,ANNOUNCE.filter(Boolean).join("　　　◆　　　").length*ANNOUNCE_SPEED)+"s");$("ann").hidden=false;})();
+(()=>{
+  if(!PATCH.length){$("pn").hidden=true;return;}
+  $("pns").textContent="パッチノート";
+  $("pnb").innerHTML=PATCH.map((r,i)=>`
+    <details class="patch-ver"${i===0?" open":""}>
+      <summary>ver${esc(r.v)}　<span class="mu">${esc(r.date||"")}</span></summary>
+      <div class="patch-body">
+        ${r.sec.map(([t,l])=>`<div class="ph">【${esc(t)}】</div><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")}
+      </div>
+    </details>
+  `).join("");
+})();
+(()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!ANNOUNCE.filter(Boolean).length)return;$("annt").textContent=ANNOUNCE.filter(Boolean).join("　　　◆　　　");$("annt").style.setProperty("--d",Math.max(15,ANNOUNCE.filter(Boolean).join("　　　◆ $nbsp;　").length*ANNOUNCE_SPEED)+"s");$("ann").hidden=false;})();
 pl();gl();
 </script>
 </body>
