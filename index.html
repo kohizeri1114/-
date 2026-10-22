@@ -34,6 +34,14 @@ input,select{border:1px solid var(--bd);background:var(--bg);border-radius:8px;p
 .slot .in input{width:100%}
 .slot .in input.n{width:54px;padding:6px}
 .tw{overflow-x:auto}
+#pn summary{cursor:pointer;font-weight:700}#pn h4{margin:14px 0 4px}#pn ul{margin:4px 0 8px;padding-left:20px}#pn li{margin:2px 0}
+.sw{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.sw input{position:absolute;opacity:0;width:0;height:0;padding:0;border:0}
+.sw i{position:relative;width:40px;height:22px;border-radius:999px;background:var(--bd);transition:.15s;flex:none}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+.sw input:checked+i{background:var(--ac)}
+.sw input:checked+i::after{left:20px}
+.sw input:focus-visible+i{outline:2px solid var(--ac);outline-offset:2px}
 .ann{overflow:hidden;white-space:nowrap;background:var(--ac);color:#fff;font-size:14px;padding:6px 0}
 .annt{display:inline-block;padding-left:100%;animation:annm var(--d,20s) linear infinite}
 .ann:hover .annt{animation-play-state:paused}
@@ -45,6 +53,7 @@ details.mt{border-bottom:1px solid var(--bd);padding:6px 0}details.mt summary{cu
 tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 </style></head><body><div id="ann" class="ann" hidden><div id="annt" class="annt"></div></div><div class="w">
 <h1>ろるぱーくカスタム管理アプリ</h1>
+<details class="card" id="pn"><summary id="pns"></summary><div id="pnb"></div></details>
 <div class="row" style="margin-bottom:12px"><b>団体</b><select id="gs"></select></div>
 <div class="tabs"><button id="t1" class="on">チーム分け</button><button id="t2">戦績</button><button id="t3">履歴</button><button id="t4">設定</button></div>
 
@@ -56,11 +65,11 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
   </div>
   <div class="card">
     <div class="row">
-      <label><input type="radio" name="m" value="free" checked> ロール指定なし</label>
-      <label><input type="radio" name="m" value="role"> ロール指定あり</label>
+      <label class="sw"><input type="checkbox" id="swr"><i></i>ロール指定</label>
+      <label class="sw"><input type="checkbox" id="swb"><i></i>レートバランス</label>
       <button class="pri" id="go">このメンバーでチーム分け</button>
     </div>
-    <div class="mu">選択した希望ロール・希望サイドが優先されます。11人以上のときは10人をランダムに選び観戦者を抽選します。「優先出場」にチェックした人は優先的に出場します。</div>
+    <div class="mu">選択した希望ロール・希望サイドが優先されます。11人以上のときは10人をランダムに選び観戦者を抽選します。「優先出場」にチェックした人は優先的に出場します。「レートバランス」をオンにすると、各自のカスタムレートが両チームで近くなる組み合わせを選びます（記録のない人は初期レート扱い）。</div>
   </div>
   <div id="res"></div>
 </div>
@@ -83,7 +92,7 @@ tr.cl{cursor:pointer}tr.cl:hover{background:var(--bg)}
 </div>
 <datalist id="champs"></datalist><datalist id="names"></datalist>
 <script>
-//アナウンス
+// ▼ 上部に流れるアナウンス。ここを書き換えて使う（複数OK、空 [] にすると非表示）
 const ANNOUNCE=[
   "ろるぱーくカスタム管理アプリ ver1.1.0",
   "試合後はチャンピオンとKDAを入力して、勝敗を保存しよう",
@@ -92,6 +101,38 @@ const ANNOUNCE=[
 ];
 // 流れる速さの調整：数字が大きいほどゆっくり（1文字あたりの秒数）
 const ANNOUNCE_SPEED=0.35;
+// ▼ カスタムレートの設定（ここを書き換えて調整。変えると全員のレートが計算し直される）
+// start:初期レート / win:勝ち+・負け-の基本点 / kda:KDA補正の上限(±) / kdaBase:基準KDA（ロール不明のとき）
+// elo:true で相手チームの強さにより増減が変わる（互角なら±win、格上に勝つと増え、格下に負けると減る）/ eloScale:大きいほどレート差の影響が小さい
+// kdaRole:ロールごとの基準KDA（これと同じKDAなら補正0）
+const RATE={start:1000,win:10,kda:5,kdaBase:2.5,elo:true,eloScale:400,kdaRole:{TOP:2.5,JG:3,MID:3,ADC:3,SUP:3.5}};
+// ▼ パッチノート。新しい版は配列の先頭に追加する（sec は [見出し, [項目...]] の並び）
+const PATCH=[
+ {v:"1.1.0",date:"2026-10-22",sec:[
+  ["新機能",[
+   "【レート】プレイヤーごとのカスタムレートを追加。初期1000、勝てば+10・負ければ-10が基本。",
+   "【レート】相手チームの強さで増減が変わるように（格上に勝つと大きく増え、格下に負けると大きく減る）。",
+   "【レート】KDAによる補正を追加。ロールごとの基準KDAと比べて最大±5。サポートは基準が高め。",
+   "【チーム分け】「レートバランス」を追加。両チームの平均レートが近くなる組み合わせを選ぶ。",
+   "【チーム分け】希望サイド（ブルー／レッド／観戦）と「優先出場」を追加。",
+   "【チーム分け】11人以上のとき、10人をランダムに選び、残りを観戦者に。",
+   "【団体】LTK・WCSのように団体ごとに参加者と戦績を分けて管理できるように。",
+   "【戦績】連勝・連敗の表示と、最大連勝・最大連敗を追加。",
+   "【戦績】味方のとき・敵のときの勝率（相性）を、プレイヤーの詳細に追加。",
+   "【履歴】試合ごとの履歴を追加。チャンピオン・KDAの修正、勝敗の変更、試合の削除ができる。",
+   "【履歴】プレイヤー・チャンピオン・期間・ロール有無での絞り込みを追加。",
+   "【設定】メンバー名の変更を追加。過去の戦績の名前もまとめて変わる。",
+   "【設定】戦績のJSON書き出し・読み込みを追加。",
+   "【入力】チャンピオン名・KDAをEnterや十字キーで次の欄へ移動できるように。",
+   "【入力】プレイヤー名・チャンピオン名の予測変換を追加。",
+   "【その他】画面上部に流れるアナウンスと、このパッチノートを追加。"]],
+  ["変更・改善",[
+   "画面を「チーム分け／戦績／履歴／設定」の4つのタブに整理。",
+   "「ロール指定」をスイッチ式に変更。",
+   "戦績の表をレート順の並びに変更。",
+   "保存形式を団体に対応したものに変更。1.0.0までのデータは「デフォルト」団体に自動で引き継がれる。"]]
+ ]}
+];
 const R=["TOP","JG","MID","ADC","SUP"];
 const K="lolsplit_v1";
 let DB={groups:[],cur:""},S;
@@ -103,7 +144,7 @@ setG(DB.cur);
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){}};
 const $=i=>document.getElementById(i);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const mode=()=>document.querySelector('input[name=m]:checked').value;
+const mode=()=>$("swr").checked?"role":"free";
 
 function tab(n){for(let i=1;i<=4;i++){$("p"+i).hidden=i!=n;$("t"+i).className=i==n?"on":"";}if(n>1)stats();}
 [1,2,3,4].forEach(i=>$("t"+i).onclick=()=>tab(i));
@@ -134,13 +175,12 @@ $("go").onclick=()=>{
   const sw=S.players.filter(p=>p.side==="spec"),pool=S.players.filter(p=>p.side!=="spec");
   if(pool.length<2){$("res").innerHTML='<div class="card">観戦希望を除いて2人以上必要です。</div>';return;}
   const pr=shuf(pool.filter(p=>p.prio)),ot=shuf(pool.filter(p=>!p.prio)),order=pr.concat(ot),ps=order.slice(0,10),spec=order.slice(10).concat(shuf(sw)),n=ps.length,h=Math.ceil(n/2),ur=mode()==="role";
-  const bs=n%2&&Math.random()<.5?n-h:h,rs=n-bs;
-  let B=ps.filter(p=>p.side==="blue"),Rd=ps.filter(p=>p.side==="red"),rest=ps.filter(p=>p.side!=="blue"&&p.side!=="red");
-  rest=rest.concat(B.splice(bs),Rd.splice(rs));
-  shuf(rest);
-  while(B.length<bs)B.push(rest.pop());
-  while(Rd.length<rs)Rd.push(rest.pop());
-  cur={mode:ur?"role":"free",blue:assign(B,ur),red:assign(Rd,ur),spec:spec.map(p=>p.name)};
+  const bs=n%2&&Math.random()<.5?n-h:h,rs=n-bs,bal=$("swb").checked,pw=bal?power():{},sc=p=>pw[p.name]||0,sum=t=>t.reduce((a,p)=>a+sc(p),0);
+  const mk=()=>{let B=ps.filter(p=>p.side==="blue"),Rd=ps.filter(p=>p.side==="red"),rest=ps.filter(p=>p.side!=="blue"&&p.side!=="red");rest=rest.concat(B.splice(bs),Rd.splice(rs));shuf(rest);while(B.length<bs)B.push(rest.pop());while(Rd.length<rs)Rd.push(rest.pop());return{B,Rd};};
+  let best=mk(),info="";
+  if(bal){const c=[];for(let i=0;i<300;i++){const x=mk();x.d=Math.abs(sum(x.B)-sum(x.Rd));c.push(x);}c.sort((a,b)=>a.d-b.d);best=c[Math.floor(Math.random()*Math.min(5,c.length))];const av=t=>Math.round(t.reduce((a,p)=>a+sc(p),0)/Math.max(1,t.length)+RATE.start);info="平均レート ブルー "+av(best.B)+" / レッド "+av(best.Rd)+"（差 "+Math.abs(av(best.B)-av(best.Rd))+"）";}
+  const B=best.B,Rd=best.Rd;
+  cur={mode:ur?"role":"free",blue:assign(B,ur),red:assign(Rd,ur),spec:spec.map(p=>p.name),bal:info};
   show();
 };
 function slot(side,t){
@@ -152,7 +192,7 @@ function slot(side,t){
 }
 function show(){
   $("res").innerHTML=`<div class="teams"><div class="team bl"><h3>ブルーサイド</h3>${slot("blue",cur.blue)}</div><div class="team rd"><h3>レッドサイド</h3>${slot("red",cur.red)}</div></div>
-  ${cur.spec&&cur.spec.length?`<div class="card" style="margin-top:14px"><b>観戦</b>：${cur.spec.map(esc).join("、")}</div>`:""}<div class="card" style="margin-top:14px"><div class="mu">試合後にチャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
+  ${cur.bal?`<div class="mu" style="margin-top:10px">⚖ ${esc(cur.bal)}</div>`:""}${cur.spec&&cur.spec.length?`<div class="card" style="margin-top:14px"><b>観戦</b>：${cur.spec.map(esc).join("、")}</div>`:""}<div class="card" style="margin-top:14px"><div class="mu">試合後にチャンピオン・KDAを入力して勝敗を保存すると戦績に反映されます（入力は任意）。</div>
   <div class="row" style="margin-top:8px"><button class="b" data-w="blue">ブルー勝利で保存</button><button class="r" data-w="red">レッド勝利で保存</button></div></div>`;
 }
 $("res").addEventListener("click",e=>{
@@ -178,29 +218,44 @@ function agg(){
   return A;
 }
 let openId=null,delArm=null;
+function power(){const o={},RT=rate();Object.keys(RT.rt).forEach(n=>o[n]=RT.rt[n]-RATE.start);return o;}
+function rate(){
+  const rt={},pk={},dl={},ls={},cr=n=>rt[n]??RATE.start;
+  S.history.forEach(m=>{dl[m.id]={};
+    const av=t=>t.length?t.reduce((a,p)=>a+cr(p.name),0)/t.length:RATE.start,ab=av(m.blue),ar=av(m.red),up=[];
+    ["blue","red"].forEach(sd=>m[sd].forEach(p=>{
+      const win=m.winner===sd?1:0,own=sd==="blue"?ab:ar,opp=sd==="blue"?ar:ab;
+      let d=RATE.elo?Math.round(2*RATE.win*(win-1/(1+Math.pow(10,(opp-own)/RATE.eloScale)))):(win?RATE.win:-RATE.win);
+      if(p.k!=null&&p.d!=null&&p.a!=null){const base=RATE.kdaRole[p.role]??RATE.kdaBase,kda=(p.k+p.a)/Math.max(p.d,1);d+=Math.round(Math.max(-RATE.kda,Math.min(RATE.kda,(kda-base)*2)));}
+      up.push([p.name,d]);
+    }));
+    up.forEach(([n,d])=>{const v=cr(n)+d;rt[n]=v;pk[n]=Math.max(pk[n]??RATE.start,v);dl[m.id][n]=d;(ls[n]||(ls[n]=[])).push(d);});
+  });
+  return{rt,pk,dl,ls};
+}
 function stk(r){let run=0,last=null,bw=0,bl=0;r.forEach(x=>{if(x===last)run++;else{run=1;last=x;}if(x)bw=Math.max(bw,run);else bl=Math.max(bl,run);});return{cur:r.length?(last?run:-run):0,bw,bl};}
 function stkT(r){const c=stk(r).cur;return c>=2?`<span style="color:var(--bl)">${c}連勝</span>`:c<=-2?`<span style="color:var(--rd)">${-c}連敗</span>`:"-";}
 function pairs(n){const al={},en={};S.history.forEach(m=>{const sd0=m.blue.some(p=>p.name===n)?"blue":m.red.some(p=>p.name===n)?"red":null;if(!sd0)return;const win=m.winner===sd0;["blue","red"].forEach(sd=>m[sd].forEach(p=>{if(p.name===n)return;const o=sd===sd0?al:en,c=o[p.name]||(o[p.name]={g:0,w:0});c.g++;if(win)c.w++;}));});return{al,en};}
 function fillP(){const set=new Set();S.history.forEach(m=>[...m.blue,...m.red].forEach(p=>set.add(p.name)));const c=$("fp").value;$("fp").innerHTML='<option value="">全員</option>'+[...set].map(n=>`<option${n===c?" selected":""}>${esc(n)}</option>`).join("");}
 function fillRo(){const set=new Set(S.players.map(p=>p.name));S.history.forEach(m=>[...m.blue,...m.red].forEach(p=>set.add(p.name)));const c=$("ro").value;$("ro").innerHTML='<option value="">変更する人</option>'+[...set].map(n=>`<option${n===c?" selected":""}>${esc(n)}</option>`).join("");}
 function pass(m,F){const ps=[...m.blue,...m.red];return(!F.f||m.date>=F.f)&&(!F.t||m.date<=F.t)&&(!F.m||m.mode===F.m)&&(!F.p&&!F.c||ps.some(x=>(!F.p||x.name===F.p)&&(!F.c||(x.champ||"").includes(F.c))));}
-function mh(){
-  const side=(t,sd)=>t.map((p,i)=>`<div class="slot"><div class="role">${p.role||"　"}</div><div><b>${esc(p.name)}</b></div><div class="in"><input data-f="champ" data-s="${sd}" data-i="${i}" placeholder="チャンピオン" value="${esc(p.champ||"")}" style="flex:1;min-width:100px">${["k","d","a"].map(f=>`<input class="n" data-f="${f}" data-s="${sd}" data-i="${i}" type="number" min="0" placeholder="${f.toUpperCase()}" value="${p[f]==null?"":p[f]}">`).join("")}</div></div>`).join("");
+function mh(){const RT=rate(),dt=(id,n)=>{const d=RT.dl[id]&&RT.dl[id][n];return d==null?"":`<span class="mu" style="color:var(--${d>=0?"bl":"rd"})">${d>0?"+"+d:d}</span>`;};
+  const side=(t,sd,id)=>t.map((p,i)=>`<div class="slot"><div class="role">${p.role||"　"}</div><div><b>${esc(p.name)}</b> ${dt(id,p.name)}</div><div class="in"><input data-f="champ" data-s="${sd}" data-i="${i}" placeholder="チャンピオン" value="${esc(p.champ||"")}" style="flex:1;min-width:100px">${["k","d","a"].map(f=>`<input class="n" data-f="${f}" data-s="${sd}" data-i="${i}" type="number" min="0" placeholder="${f.toUpperCase()}" value="${p[f]==null?"":p[f]}">`).join("")}</div></div>`).join("");
   fillP();const F={p:$("fp").value,c:$("fc").value.trim(),f:$("ff").value,t:$("ft").value,m:$("fm").value},L=S.history.filter(m=>pass(m,F)).reverse();$("fn").textContent=L.length+" / "+S.history.length+"試合";
-  $("mh").innerHTML=L.length?L.map(m=>`<details class="mt" data-id="${m.id}"${m.id===openId?" open":""}><summary>${esc(m.date)}　<b style="color:var(--${m.winner==="blue"?"bl":"rd"})">${m.winner==="blue"?"ブルー":"レッド"}勝利</b>　<span class="mu">${m.mode==="role"?"ロールあり":"ロールなし"}</span></summary><div class="teams" style="margin:8px 0"><div class="team bl"><h3>ブルー</h3>${side(m.blue,"blue")}</div><div class="team rd"><h3>レッド</h3>${side(m.red,"red")}</div></div><div class="row" style="margin-bottom:6px"><button class="pri" data-a="save">変更を保存</button><button data-a="flip">勝敗を逆にする</button><button class="r" data-a="del">削除</button></div></details>`).join(""):'<div class="mu">まだ記録がありません。</div>';
+  $("mh").innerHTML=L.length?L.map(m=>`<details class="mt" data-id="${m.id}"${m.id===openId?" open":""}><summary>${esc(m.date)}　<b style="color:var(--${m.winner==="blue"?"bl":"rd"})">${m.winner==="blue"?"ブルー":"レッド"}勝利</b>　<span class="mu">${m.mode==="role"?"ロールあり":"ロールなし"}</span></summary><div class="teams" style="margin:8px 0"><div class="team bl"><h3>ブルー</h3>${side(m.blue,"blue",m.id)}</div><div class="team rd"><h3>レッド</h3>${side(m.red,"red",m.id)}</div></div><div class="row" style="margin-bottom:6px"><button class="pri" data-a="save">変更を保存</button><button data-a="flip">勝敗を逆にする</button><button class="r" data-a="del">削除</button></div></details>`).join(""):'<div class="mu">まだ記録がありません。</div>';
 }
 const pct=(w,g)=>g?Math.round(w/g*100)+"%":"-";
 function stats(){gl();mh();dl();fillRo();
-  const A=agg(),names=Object.keys(A).sort((a,b)=>A[b].g-A[a].g);
+  const A=agg(),RT=rate(),names=Object.keys(A).sort((a,b)=>RT.rt[b]-RT.rt[a]||A[b].g-A[a].g);
   $("dt").hidden=true;
-  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>試合</th><th>勝</th><th>勝率</th><th>平均KDA</th><th>連続</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td><td>${stkT(a.res)}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細</div>`:'<div class="mu">まだ記録がありません。</div>';
+  $("st").innerHTML=names.length?`<table><tr><th>名前</th><th>レート</th><th>試合</th><th>勝</th><th>勝率</th><th>平均KDA</th><th>連続</th></tr>${names.map(n=>{const a=A[n];return `<tr class="cl" data-n="${esc(n)}"><td>${esc(n)}</td><td><b>${RT.rt[n]}</b></td><td>${a.g}</td><td>${a.w}</td><td>${pct(a.w,a.g)}</td><td>${a.kg?(a.d?((a.k+a.a)/a.d).toFixed(2):"Perfect"):"-"}</td><td>${stkT(a.res)}</td></tr>`}).join("")}</table><div class="mu" style="margin-top:6px">行をタップで詳細　／　レート: 初期${RATE.start}、勝敗±${RATE.win}${RATE.elo?"（相手チームの強さで増減）":""}、KDAで最大±${RATE.kda}加減（ロール別の基準あり）</div>`:'<div class="mu">まだ記録がありません。</div>';
 }
 $("st").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-n]");if(!tr)return;
-  const n=tr.dataset.n,a=agg()[n],sk=stk(a.res),P=pairs(n),tb=o=>Object.keys(o).length?`<div class="tw"><table><tr><th>相手</th><th>試合</th><th>勝率</th></tr>${rows(o)}</table></div>`:'<div class="mu">記録なし</div>';
+  const n=tr.dataset.n,a=agg()[n],sk=stk(a.res),RT=rate(),P=pairs(n),tb=o=>Object.keys(o).length?`<div class="tw"><table><tr><th>相手</th><th>試合</th><th>勝率</th></tr>${rows(o)}</table></div>`:'<div class="mu">記録なし</div>';
   const rows=o=>Object.entries(o).sort((x,y)=>y[1].g-x[1].g).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.g}</td><td>${pct(v.w,v.g)}</td></tr>`).join("");
   $("dt").hidden=false;
-  $("dt").innerHTML=`<h3 style="margin:0 0 8px">${esc(n)}</h3><div class="mu">合計 K${a.k} / D${a.d} / A${a.a}（入力があった${a.kg}試合）</div><div class="mu">最大 ${sk.bw}連勝 / ${sk.bl}連敗</div>
+  $("dt").innerHTML=`<h3 style="margin:0 0 8px">${esc(n)}</h3><div class="mu">合計 K${a.k} / D${a.d} / A${a.a}（入力があった${a.kg}試合）</div><div class="mu">最大 ${sk.bw}連勝 / ${sk.bl}連敗</div><div class="mu">レート <b>${RT.rt[n]}</b>（最高 ${RT.pk[n]}）　直近の増減: ${(RT.ls[n]||[]).slice(-5).map(d=>d>0?"+"+d:d).join(" ")}</div>
   <h4>ピックチャンピオン</h4>${Object.keys(a.ch).length?`<div class="tw"><table><tr><th>チャンプ</th><th>試合</th><th>勝率</th></tr>${rows(a.ch)}</table></div>`:'<div class="mu">記録なし</div>'}
   <h4>味方のときの勝率</h4>${tb(P.al)}<h4>敵のときの勝率</h4>${tb(P.en)}
   <h4>ロール別</h4>${Object.keys(a.ro).length?`<div class="tw"><table><tr><th>ロール</th><th>試合</th><th>勝率</th></tr>${rows(a.ro)}</table></div>`:'<div class="mu">記録なし</div>'}`;
@@ -292,6 +347,10 @@ $("rn").onclick=()=>{
   if(po){if(S.players.some(p=>p.name===n))S.players=S.players.filter(p=>p!==po);else po.name=n;}
   save();pl();stats();$("rv").value="";r.textContent="「"+o+"」を「"+n+"」に"+(merged?"統合":"変更")+"しました。";
 };
+$("swr").checked=!!(DB.opt&&DB.opt.r);$("swb").checked=!!(DB.opt&&DB.opt.b);
+["swr","swb"].forEach(i=>$(i).onchange=()=>{DB.opt={r:$("swr").checked,b:$("swb").checked};save();});
+(()=>{if(!PATCH.length){$("pn").hidden=true;return;}$("pns").textContent="📝 ver"+PATCH[0].v+" パッチノート";
+  $("pnb").innerHTML=PATCH.map(r=>`<h4>ver${esc(r.v)}　<span class="mu">${esc(r.date||"")}</span></h4>`+r.sec.map(([t,l])=>`<div class="mu"><b>${esc(t)}</b></div><ul>${l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`).join("")).join("");})();
 (()=>{const t=ANNOUNCE.filter(Boolean).join("　　　◆　　　");if(!t)return;$("annt").textContent=t;$("annt").style.setProperty("--d",Math.max(15,t.length*ANNOUNCE_SPEED)+"s");$("ann").hidden=false;})();
 pl();gl();
 </script></body></html>
